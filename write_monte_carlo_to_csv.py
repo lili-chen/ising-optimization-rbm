@@ -176,7 +176,7 @@ def max_cut(file_name, num_repetitions, num_trials):
         arr = line[:-1].split("\t")
         ind1 = int(arr[0])
         ind2 = int(arr[1])
-        ind3 = int(arr[2])
+        ind3 = float(arr[2])
         W[ind1-1][ind2-1] = ind3
 
     cg = Max_Cut_Approximator(num_vertices)
@@ -299,7 +299,7 @@ with open('results.csv', 'w') as csvfile:
     result = [[],[],[],[]]
     for i in range(9):
         prob_size_max_cuts = []
-        for j in range(10):
+        for j in range(15):
             num_zeros = int(all_files[i*10+j][0]<100)
             entry = all_files[i*10+j]
             _n = entry[0]
