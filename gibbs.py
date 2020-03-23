@@ -330,7 +330,7 @@ def plot_max_cut_efficiency_discrete_rbm(file_name, num_trials, step_size):
     cg = Max_Cut_Approximator(2*num_vertices)
     b = np.zeros(2*num_vertices)
 
-    cuts = np.array(cg.get_cut_sizes_discrete_rbm(num_trials, -0.5*W, b, step_size))
+    cuts = np.array(cg.get_cut_sizes_discrete_rbm(num_trials, -0.1*W, b, step_size))
     cuts = cuts.reshape(len(cuts), 2).T
     plt.plot(cuts[0], cuts[1])
     plt.show()
