@@ -90,9 +90,13 @@ class Max_Cut_Approximator(Gibbs):
                 with_zeros = [-1] * (self.size - len(binary)) + binary
                 cuts += [(k, self.cut_size_rbm(W, with_zeros))]
 
+        # print(best_state)
+        # print(with_zeros)
+
         return cuts
 
     def get_cut_sizes_continuous(self, num_trials, W, b):
+
         random.seed(42)
         np.random.seed(42)
 
@@ -122,8 +126,25 @@ class Max_Cut_Approximator(Gibbs):
             binary = [-1 if i == 0 else 1 for i in list(map(int, bin(best_state)[2:]))]
             with_zeros = [-1] * (self.size - len(binary)) + binary
             cuts += [(total_time, self.cut_size(W, with_zeros))]
+            # print(best_state)
 
         return cuts
+
+    def check_distribution(self, W):
+
+        hamiltonians = []
+
+        for state in range(int(2**len(W))):
+            binary = [-1 if i == 0 else 1 for i in list(map(int, bin(state)[2:]))]
+            with_zeros = [-1] * (self.size - len(binary)) + binary
+
+            H = 0
+            for i in range(len(W)):
+                for j in range(len(W)):
+                    H -= -2 * W[i][j] * with_zeros[i] * with_zeros[j] # J = -W[i][j]
+            hamiltonians += [H]
+
+        return np.exp(hamiltonians)/np.sum(np.exp(hamiltonians))
 
     def get_cut_sizes_continuous_rbm(self, num_trials, W, b):
         random.seed(42)
@@ -167,7 +188,8 @@ class Max_Cut_Approximator(Gibbs):
             outgoing_edges = W[i]
             for j in range(len(outgoing_edges)):
                 if outgoing_edges[j] != 0: # edge exists between vertex i and vertex j
-                    if num_vertices+i < j and joint_state[i] != joint_state[j] and abs(i-j) != num_vertices: # on different sides of the cut
+                    if num_vertices+i < j and joint_state[i] != joint_state[j]:
+                    # if num_vertices+i < j and joint_state[i] != joint_state[j] and abs(i-j) != num_vertices: # on different sides of the cut
                         cut += 1
         return cut
 
@@ -227,7 +249,8 @@ def max_cut(file_name, num_repetitions, num_trials):
         result += [(best_state, H, cut)]
     return result
 
-def plot_max_cut_efficiency_discrete(file_name, num_trials, step_size):
+def plot_max_cut_efficiency_discrete(i, j, all_files, num_trials, step_size):
+    file_name, _cut = get_filename_and_cut(i, j, all_files)
     file1 = open(file_name,"r")
     arr = file1.readline()[:-1].split("\t") # first line
     num_vertices = int(arr[0])
@@ -247,10 +270,17 @@ def plot_max_cut_efficiency_discrete(file_name, num_trials, step_size):
 
     cuts = np.array(cg.get_cut_sizes_discrete(num_trials, -0.5*W, b, step_size))
     cuts = cuts.reshape(len(cuts), 2).T
-    plt.plot(cuts[0], cuts[1])
+    plt.plot(cuts[0], [_cut]*len(cuts[0]), label="Theoretical Max Cut")
+    plt.plot(cuts[0], cuts[1], label="Algorithm Max Cut")
+    plt.xlabel("Trial Number")
+    plt.ylabel("Cut Size")
+    plt.title(file_name)
+    plt.legend()
     plt.show()
 
-def plot_max_cut_efficiency_continuous(file_name, num_trials):
+
+def plot_max_cut_efficiency_continuous(i, j, all_files, num_trials):
+    file_name, _cut = get_filename_and_cut(i, j, all_files)
     file1 = open(file_name,"r")
     arr = file1.readline()[:-1].split("\t") # first line
     num_vertices = int(arr[0])
@@ -270,10 +300,16 @@ def plot_max_cut_efficiency_continuous(file_name, num_trials):
 
     cuts = np.array(cg.get_cut_sizes_continuous(num_trials, -0.5*W, b))
     cuts = cuts.reshape(len(cuts), 2).T
-    plt.plot(cuts[0], cuts[1])
+    plt.plot(cuts[0], [_cut]*len(cuts[0]), label="Theoretical Max Cut")
+    plt.plot(cuts[0], cuts[1], label="Algorithm Max Cut")
+    plt.xlabel("Trial Number")
+    plt.ylabel("Cut Size")
+    plt.title(file_name)
+    plt.legend()
     plt.show()
 
-def plot_max_cut_efficiency_continuous_rbm(file_name, num_trials):
+def plot_max_cut_efficiency_continuous_rbm(i, j, all_files, num_trials):
+    file_name, _cut = get_filename_and_cut(i, j, all_files)
     file1 = open(file_name,"r")
     arr = file1.readline()[:-1].split("\t") # first line
     num_vertices = int(arr[0])
@@ -301,10 +337,16 @@ def plot_max_cut_efficiency_continuous_rbm(file_name, num_trials):
 
     cuts = np.array(cg.get_cut_sizes_continuous_rbm(num_trials, -0.5*W, b))
     cuts = cuts.reshape(len(cuts), 2).T
-    plt.plot(cuts[0], cuts[1])
+    plt.plot(cuts[0], [_cut]*len(cuts[0]), label="Theoretical Max Cut")
+    plt.plot(cuts[0], cuts[1], label="Algorithm Max Cut")
+    plt.xlabel("Trial Number")
+    plt.ylabel("Cut Size")
+    plt.title(file_name)
+    plt.legend()
     plt.show()
 
-def plot_max_cut_efficiency_discrete_rbm(file_name, num_trials, step_size):
+def plot_max_cut_efficiency_discrete_rbm(i, j, all_files, num_trials, step_size):
+    file_name, _cut = get_filename_and_cut(i, j, all_files)
     file1 = open(file_name,"r")
     arr = file1.readline()[:-1].split("\t") # first line
     num_vertices = int(arr[0])
@@ -324,16 +366,33 @@ def plot_max_cut_efficiency_discrete_rbm(file_name, num_trials, step_size):
 
     for i in range(num_vertices):
         total = np.sum(W[i])
-        W[i][num_vertices+i] = -total
-        W[num_vertices+i][i] = -total
+        W[i][num_vertices+i] = -2*total
+        W[num_vertices+i][i] = -2*total
 
     cg = Max_Cut_Approximator(2*num_vertices)
     b = np.zeros(2*num_vertices)
 
     cuts = np.array(cg.get_cut_sizes_discrete_rbm(num_trials, -0.1*W, b, step_size))
     cuts = cuts.reshape(len(cuts), 2).T
-    plt.plot(cuts[0], cuts[1])
+    plt.plot(cuts[0], [_cut]*len(cuts[0]), label="Theoretical Max Cut")
+    plt.plot(cuts[0], cuts[1], label="Algorithm Max Cut")
+    plt.xlabel("Trial Number")
+    plt.ylabel("Cut Size")
+    plt.title(file_name)
+    plt.legend()
     plt.show()
+
+def get_filename_and_cut(i, j, all_files):
+    num_zeros = int(all_files[i*10+j][0]<100)
+    entry = all_files[i*10+j]
+    _n = entry[0]
+    _id = entry[1]
+    _ed = entry[2]
+    _cut = entry[3]
+    _H = entry[4]
+    _soln = entry[5]
+    entry_filename = "maxcut/N" + (num_zeros * "0") + str(_n) + "-id0" + str(_id) + ".txt"
+    return entry_filename, _cut
 
 def calculate_distribution(file_name):
     file1 = open(file_name,"r")
