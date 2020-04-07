@@ -104,6 +104,54 @@ class Max_Cut_Approximator(Gibbs):
             return cuts, self.map_rbm_result(result, int(len(W)/2))
         return cuts, result
 
+    def get_distribution_continuous(self, num_trials, W, b):
+        random.seed(42)
+        np.random.seed(42)
+
+        s = [random.choice([-1, 1]) for i in range(self.size)]
+        result = dict()
+        lambdas = [self.base_lambda] * self.size
+
+        cuts = []
+        total_time = 0
+        while total_time < num_trials:
+            # competing exponentials
+            times = [-np.log(1-np.random.uniform(0,1))/lambdas[i] for i in range(self.size)]
+
+            # update the s[i] of the exponential that hit first
+            argmin_time = np.argmin(times)
+            if self.state_to_int(s) not in result:
+                result[self.state_to_int(s)] = 0
+            result[self.state_to_int(s)] += times[argmin_time]
+            s[argmin_time] = -s[argmin_time]
+            total_time += argmin_time
+
+            # update summation, sigmoid, and lambdas
+            sigmoids = np.multiply(np.add(np.tanh(np.add(np.matmul(s, W), b)), 1), 0.5)
+            lambdas = [(1-sigmoids[i])*self.base_lambda if s[i] == 1 else sigmoids[i]*self.base_lambda for i in range(self.size)]
+
+        return result
+
+    def get_distribution_discrete(self, num_trials, W, b):
+        random.seed(43)
+        np.random.seed(43)
+
+        s = [random.choice([-1, 1]) for i in range(self.size)]
+        result = dict()
+
+        cuts = []
+        for k in range(num_trials):
+            for i in range(self.size):
+                summation = np.dot(W[i], s)
+                s[i] = np.sign(np.tanh(summation + b[i]) + random.uniform(-1, 1))
+
+            if self.state_to_int(s) not in result:
+                result[self.state_to_int(s)] = 0
+            result[self.state_to_int(s)] += 1
+
+        return result
+
+
     def cut_size(self, W, joint_state, is_rbm):
         num_vertices = int(len(W)/2) if is_rbm else len(W)
 
@@ -138,39 +186,53 @@ class Max_Cut_Approximator(Gibbs):
 
 # --- FUNCTIONS
 
-def max_cut(file_name, num_repetitions, num_trials):
+def max_cut(file_name, num_repetitions, num_trials, csv_name):
     file1 = open(file_name,"r")
     arr = file1.readline()[:-1].split("\t") # first line
     num_vertices = int(arr[0])
 
-    W = np.zeros((num_vertices, num_vertices))
-
-    for line in file1:
-        arr = line[:-1].split("\t")
-        ind1 = int(arr[0])
-        ind2 = int(arr[1])
-        ind3 = int(arr[2])
-        W[ind1-1][ind2-1] = ind3
-
-    cg = Max_Cut_Approximator(num_vertices)
-    b = np.zeros(num_vertices)
-
-    result = []
     for _ in range(num_repetitions):
-        dist = cg.get_distribution(num_trials, -0.5*W, b)
-        best_state = np.argmax(dist)
-        binary = [-1 if i == 0 else 1 for i in list(map(int, bin(best_state)[2:]))]
-        with_zeros = [-1] * (num_vertices - len(binary)) + binary
+        if csv_name == 'continuous.csv':
+            W, b = get_W_and_b(file1, num_vertices)
+            cg = Max_Cut_Approximator(num_vertices)
+            result = cg.get_distribution_continuous(num_trials, -0.5*W, b)
+            best_state = max(result, key=result.get)
+            binary = [-1 if i == 0 else 1 for i in list(map(int, bin(best_state)[2:]))]
+            with_zeros = [-1] * (num_vertices - len(binary)) + binary
+            cut = cg.cut_size(W, with_zeros, False)
+        elif csv_name == 'discrete.csv':
+            W, b = get_W_and_b(file1, num_vertices)
+            cg = Max_Cut_Approximator(num_vertices)
+            result = cg.get_distribution_discrete(num_trials, -0.5*W, b)
+            best_state = max(result, key=result.get)
+            binary = [-1 if i == 0 else 1 for i in list(map(int, bin(best_state)[2:]))]
+            with_zeros = [-1] * (num_vertices - len(binary)) + binary
+            cut = cg.cut_size(W, with_zeros, False)
+        elif csv_name == 'continuous_rbm.csv':
+            W, b = get_W_and_b_rbm(file1, num_vertices, 10)
+            cg = Max_Cut_Approximator(2*num_vertices)
+            result = cg.get_distribution_continuous(num_trials, -0.5*W, b)
+            best_state = max(result, key=result.get)
+            binary = [-1 if i == 0 else 1 for i in list(map(int, bin(best_state)[2:]))]
+            with_zeros = [-1] * (2*num_vertices - len(binary)) + binary
+            cut = cg.cut_size(W, with_zeros, True)
+        else:
+            W, b = get_W_and_b_rbm(file1, num_vertices, 10)
+            cg = Max_Cut_Approximator(2*num_vertices)
+            result = cg.get_distribution_discrete(num_trials, -0.5*W, b)
+            best_state = max(result, key=result.get)
+            binary = [-1 if i == 0 else 1 for i in list(map(int, bin(best_state)[2:]))]
+            with_zeros = [-1] * (2*num_vertices - len(binary)) + binary
+            cut = cg.cut_size(W, with_zeros, True)
+
         # calculate Hamiltonian
-        H = 0
-        for i in range(num_vertices):
-            for j in range(num_vertices):
-                H -= 2 * -W[i][j] * with_zeros[i] * with_zeros[j] # J = -W[i][j]
+        # H = 0
+        # for i in range(num_vertices):
+        #     for j in range(num_vertices):
+        #         H -= 2 * -W[i][j] * with_zeros[i] * with_zeros[j] # J = -W[i][j]
 
-        cut = cg.cut_size(W, with_zeros, False)
-
-        result += [(best_state, H, cut)]
-    return result
+        # result += [(best_state, H, cut)]
+    return cut
 
 def get_W_and_b(file1, num_vertices):
     W = np.zeros((num_vertices, num_vertices))
@@ -199,9 +261,11 @@ def get_W_and_b_rbm(file1, num_vertices, coupling):
         W[ind2-1][num_vertices+ind1-1] = ind3
 
     for i in range(num_vertices):
-        total = np.sum(W[i])
-        W[i][num_vertices+i] = -coupling*total
-        W[num_vertices+i][i] = -coupling*total
+        # total = np.sum(W[i])
+        # W[i][num_vertices+i] = -coupling*total
+        # W[num_vertices+i][i] = -coupling*total
+        W[i][num_vertices+i] = -coupling
+        W[num_vertices+i][i] = -coupling
 
     b = np.zeros(2*num_vertices)
     return W, b
