@@ -1,8 +1,6 @@
 
 # coding: utf-8
 
-# In[1]:
-
 
 # --- IMPORTS
 
@@ -10,12 +8,6 @@ import numpy as np
 import random
 import matplotlib.pyplot as plt
 import os
-import time
-
-import cProfile
-
-
-# In[2]:
 
 
 # --- CLASSES
@@ -151,7 +143,6 @@ class Max_Cut_Approximator(Gibbs):
 
         return result
 
-
     def cut_size(self, W, joint_state, is_rbm):
         num_vertices = int(len(W)/2) if is_rbm else len(W)
 
@@ -174,14 +165,10 @@ class Max_Cut_Approximator(Gibbs):
             with_zeros = with_zeros1[:num_vertices] # just first half
             out = 0
             for bit in with_zeros:
-                out = (out << 1) | bit # https://stackoverflow.com/questions/12461361/bits-list-to-integer-in-python
+                out = (out << 1) | bit
             result_mapped[out] = result[state]
 
         return result_mapped
-
-
-
-# In[3]:
 
 
 # --- FUNCTIONS
@@ -202,12 +189,12 @@ def max_cut(file_name, num_repetitions, num_trials, csv_name):
             cut = cg.cut_size(W, with_zeros, False)
         elif csv_name == 'discrete.csv':
             W, b = get_W_and_b(file1, num_vertices)
-            cg = Max_Cut_Approximator(num_vertices)
-            result = cg.get_distribution_discrete(num_trials, -0.5*W, b)
+            dg = Max_Cut_Approximator(num_vertices)
+            result = dg.get_distribution_discrete(int(num_trials/num_vertices), -0.5*W, b)
             best_state = max(result, key=result.get)
             binary = [-1 if i == 0 else 1 for i in list(map(int, bin(best_state)[2:]))]
             with_zeros = [-1] * (num_vertices - len(binary)) + binary
-            cut = cg.cut_size(W, with_zeros, False)
+            cut = dg.cut_size(W, with_zeros, False)
         elif csv_name == 'continuous_rbm.csv':
             W, b = get_W_and_b_rbm(file1, num_vertices, 10)
             cg = Max_Cut_Approximator(2*num_vertices)
@@ -218,20 +205,12 @@ def max_cut(file_name, num_repetitions, num_trials, csv_name):
             cut = cg.cut_size(W, with_zeros, True)
         else:
             W, b = get_W_and_b_rbm(file1, num_vertices, 10)
-            cg = Max_Cut_Approximator(2*num_vertices)
-            result = cg.get_distribution_discrete(num_trials, -0.5*W, b)
+            dg = Max_Cut_Approximator(2*num_vertices)
+            result = dg.get_distribution_discrete(int(num_trials/2), -0.3*W, b)
             best_state = max(result, key=result.get)
             binary = [-1 if i == 0 else 1 for i in list(map(int, bin(best_state)[2:]))]
             with_zeros = [-1] * (2*num_vertices - len(binary)) + binary
-            cut = cg.cut_size(W, with_zeros, True)
-
-        # calculate Hamiltonian
-        # H = 0
-        # for i in range(num_vertices):
-        #     for j in range(num_vertices):
-        #         H -= 2 * -W[i][j] * with_zeros[i] * with_zeros[j] # J = -W[i][j]
-
-        # result += [(best_state, H, cut)]
+            cut = dg.cut_size(W, with_zeros, True)
     return cut
 
 def get_W_and_b(file1, num_vertices):
@@ -261,9 +240,6 @@ def get_W_and_b_rbm(file1, num_vertices, coupling):
         W[ind2-1][num_vertices+ind1-1] = ind3
 
     for i in range(num_vertices):
-        # total = np.sum(W[i])
-        # W[i][num_vertices+i] = -coupling*total
-        # W[num_vertices+i][i] = -coupling*total
         W[i][num_vertices+i] = -coupling
         W[num_vertices+i][i] = -coupling
 
@@ -288,7 +264,10 @@ def plot_max_cut_efficiency_discrete(i, j, all_files, num_trials, step_size):
     W, b = get_W_and_b(file1, num_vertices)
     approximator = Max_Cut_Approximator(num_vertices)
     cuts, result = approximator.get_cut_sizes_discrete(num_trials, -0.5*W, b, step_size, False)
-    plot_cuts(np.array(cuts), _cut, filename)
+    cuts = np.array(cuts).T
+    cuts[0] = cuts[0]*num_vertices
+    cuts = cuts.T
+    plot_cuts(cuts, _cut, filename)
     return result
 
 def plot_max_cut_efficiency_continuous(i, j, all_files, num_trials):
@@ -321,7 +300,10 @@ def plot_max_cut_efficiency_discrete_rbm(i, j, all_files, num_trials, step_size,
     W, b = get_W_and_b_rbm(file1, num_vertices, coupling)
     approximator = Max_Cut_Approximator(2*num_vertices)
     cuts, result = approximator.get_cut_sizes_discrete(num_trials, -0.1*W, b, step_size, True)
-    plot_cuts(np.array(cuts), _cut, filename)
+    cuts = np.array(cuts).T
+    cuts[0] = cuts[0]*2
+    cuts = cuts.T
+    plot_cuts(cuts, _cut, filename)
     return result
 
 def get_filename_and_cut(i, j, all_files):
@@ -378,3 +360,6 @@ def get_target_distribution(i, j, all_files):
         hamiltonians += [-H]
 
     return np.exp(hamiltonians)/np.sum(np.exp(hamiltonians))
+
+
+# https://stackoverflow.com/questions/12461361/bits-list-to-integer-in-python
