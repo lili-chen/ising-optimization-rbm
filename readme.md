@@ -14,6 +14,10 @@ Run performance_with_trial_number-[discrete/rbm_cont/rbm-discrete/continuous].ip
 
 Run sampler_comparison.ipynb to see a comparison of the graphs from performance_with_trial_number-[discrete/rbm_cont/rbm-discrete/continuous].ipynb across samplers. (Since trials are counted differently for the various samplers, you may need to adjust the num_trials passed into each sampler).
 
+## Samplers 
+
+The code for the samplers can be found in gibbs.py.
+
 ## Author
 
 Lili Chen
